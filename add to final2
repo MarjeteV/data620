@@ -1,0 +1,319 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/MarjeteV/data620/blob/main/add%20to%20final2\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {
+        "id": "1NhPgT066v-6",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "outputId": "d6f85a93-ea24-4e4b-b251-c2f4cc1bef15"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "[nltk_data] Downloading package vader_lexicon to /root/nltk_data...\n",
+            "[nltk_data] Downloading package punkt to /root/nltk_data...\n",
+            "[nltk_data]   Unzipping tokenizers/punkt.zip.\n",
+            "[nltk_data] Downloading package stopwords to /root/nltk_data...\n",
+            "[nltk_data]   Unzipping corpora/stopwords.zip.\n"
+          ]
+        }
+      ],
+      "source": [
+        "import pandas as pd\n",
+        "import re\n",
+        "import io\n",
+        "import networkx as nx\n",
+        "import numpy as np\n",
+        "import networkx.algorithms.bipartite as bi\n",
+        "import matplotlib.pyplot as plt\n",
+        "import nltk\n",
+        "from itertools import combinations\n",
+        "from collections import Counter\n",
+        "from sklearn.feature_extraction.text import CountVectorizer\n",
+        "from nltk.corpus import stopwords\n",
+        "from nltk.tokenize import word_tokenize\n",
+        "from sklearn.preprocessing import LabelEncoder\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.neighbors import KNeighborsClassifier\n",
+        "from sklearn.tree import DecisionTreeClassifier\n",
+        "from sklearn.ensemble import RandomForestClassifier\n",
+        "from sklearn.naive_bayes import MultinomialNB\n",
+        "from sklearn.preprocessing import MinMaxScaler\n",
+        "from sklearn.model_selection import train_test_split, StratifiedShuffleSplit\n",
+        "from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix, classification_report, roc_curve\n",
+        "import string\n",
+        "from sklearn.feature_extraction.text import HashingVectorizer\n",
+        "from sklearn.utils import shuffle\n",
+        "from nltk.sentiment.vader import SentimentIntensityAnalyzer\n",
+        "nltk.download('vader_lexicon')\n",
+        "nltk.download('punkt')\n",
+        "nltk.download('stopwords')\n",
+        "import random\n",
+        "random.seed(44)\n",
+        "\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df = pd.read_csv('https://raw.githubusercontent.com/MAB592/Data620/main/Assignments/Final%20Project/JEOPARDY_CSV_150000.csv')"
+      ],
+      "metadata": {
+        "id": "ibJk9TpYorln"
+      },
+      "execution_count": 2,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df = df.dropna()"
+      ],
+      "metadata": {
+        "id": "ZNsBlCumouKv"
+      },
+      "execution_count": 3,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def remove_html_tags(text):\n",
+        "  clean = re.compile('<.*?>')\n",
+        "  return re.sub(clean, '', text)\n",
+        "\n",
+        "df[' Question'] = df[' Question'].apply(remove_html_tags)"
+      ],
+      "metadata": {
+        "id": "hUiosIweowBe"
+      },
+      "execution_count": 4,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "def clean_text(text):\n",
+        "    text = re.sub(r'\\([^)]*\\)', '', text)\n",
+        "    text = text.lower()\n",
+        "    text = text.translate(str.maketrans('', '', string.punctuation))\n",
+        "    text = re.sub(r'\\b(clue|crew)\\b', '', text)\n",
+        "    words = word_tokenize(text)\n",
+        "    stop_words = set(stopwords.words('english'))\n",
+        "    words = [word for word in words if word not in stop_words]\n",
+        "    return ' '.join(words)\n",
+        "\n",
+        "df['Cleaned_Question'] = df[' Question'].apply(clean_text)\n",
+        "df['Cleaned_Answer'] = df[' Answer'].apply(clean_text)"
+      ],
+      "metadata": {
+        "id": "_nhsULhVqf6s"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "top_categories = ['BEFORE & AFTER','SCIENCE','LITERATURE', 'POTPOURRI','WORLD HISTORY', 'WORLD ORIGNS', 'AMERICAN HISTORY', 'HISTORY','BODIES OF WATER','SPORT']"
+      ],
+      "metadata": {
+        "id": "aKGfNUjKo2zs"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "filtered_df = df[df[' Category'].isin(top_categories)]"
+      ],
+      "metadata": {
+        "id": "BCxco_mQqEHp"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "filtered_df"
+      ],
+      "metadata": {
+        "id": "OgrupIY1qYaP"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "no n gram"
+      ],
+      "metadata": {
+        "id": "bObpZ7is1PcR"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "import re\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.linear_model import LogisticRegression\n",
+        "from sklearn.pipeline import Pipeline\n",
+        "from sklearn.metrics import accuracy_score, classification_report\n",
+        "\n",
+        "X = filtered_df['Cleaned_Question']\n",
+        "y = filtered_df[' Category']\n",
+        "\n",
+        "# Split the data into training and test sets\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n",
+        "\n",
+        "# Create a pipeline with TF-IDF and Logistic Regression\n",
+        "pipeline = Pipeline([\n",
+        "    ('tfidf', TfidfVectorizer(stop_words='english')),\n",
+        "    ('clf', LogisticRegression(max_iter=1000)),\n",
+        "])\n",
+        "\n",
+        "# Train the pipeline\n",
+        "pipeline.fit(X_train, y_train)\n",
+        "\n",
+        "# Predict the answers for the test set\n",
+        "y_pred = pipeline.predict(X_test)\n",
+        "\n",
+        "# Evaluate the model\n",
+        "accuracy = accuracy_score(y_test, y_pred)\n",
+        "print(f'Accuracy: {accuracy * 100:.2f}%')\n",
+        "print(classification_report(y_test, y_pred))"
+      ],
+      "metadata": {
+        "id": "i9KUOSIRsr3I"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "import re\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.ensemble import RandomForestClassifier\n",
+        "from sklearn.pipeline import Pipeline\n",
+        "from sklearn.metrics import accuracy_score, classification_report\n",
+        "\n",
+        "X = filtered_df['Cleaned_Question']\n",
+        "y = filtered_df[' Category']\n",
+        "\n",
+        "# Split the data into training and test sets\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n",
+        "\n",
+        "# Create a pipeline with TF-IDF and\n",
+        "pipeline = Pipeline([\n",
+        "    ('tfidf', TfidfVectorizer(stop_words='english')),\n",
+        "    ('clf', RandomForestClassifier()),\n",
+        "])\n",
+        "\n",
+        "# Train the pipeline\n",
+        "pipeline.fit(X_train, y_train)\n",
+        "\n",
+        "# Predict the answers for the test set\n",
+        "y_pred = pipeline.predict(X_test)\n",
+        "\n",
+        "# Evaluate the model\n",
+        "accuracy = accuracy_score(y_test, y_pred)\n",
+        "print(f'Accuracy: {accuracy * 100:.2f}%')\n",
+        "print(classification_report(y_test, y_pred))"
+      ],
+      "metadata": {
+        "id": "xfWLBXuv7Xjf"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import pandas as pd\n",
+        "import re\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.feature_extraction.text import TfidfVectorizer\n",
+        "from sklearn.linear_model import LogisticRegression\n",
+        "from sklearn.pipeline import Pipeline\n",
+        "from sklearn.metrics import accuracy_score, classification_report\n",
+        "from sklearn.preprocessing import LabelEncoder\n",
+        "\n",
+        "#label_encoder = LabelEncoder()\n",
+        "#filtered_df['Category label'] = label_encoder.fit_transform(filtered_df[' Category'])\n",
+        "# warning <ipython-input-14-9332bd829897>:11: SettingWithCopyWarning:\n",
+        "#A value is trying to be set on a copy of a slice from a DataFrame.\n",
+        "#Try using .loc[row_indexer,col_indexer] = value instead\n",
+        "\n",
+        "#See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy\n",
+        "#  filtered_df['Category label'] = label_encoder.fit_transform(filtered_df[' Category'])\n",
+        "\n",
+        "X = filtered_df['Cleaned_Question']\n",
+        "y = filtered_df[' Category']\n",
+        "\n",
+        "# Split the data into training and test sets\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n",
+        "\n",
+        "# Create a pipeline with TF-IDF and Logistic Regression\n",
+        "pipeline = Pipeline([\n",
+        "    ('tfidf', TfidfVectorizer(stop_words='english', ngram_range=(1,2))),\n",
+        "    ('clf', LogisticRegression(max_iter=1000)),\n",
+        "])\n",
+        "\n",
+        "# Train the pipeline\n",
+        "pipeline.fit(X_train, y_train)\n",
+        "\n",
+        "# Predict the answers for the test set\n",
+        "y_pred = pipeline.predict(X_test)\n",
+        "\n",
+        "# Evaluate the model\n",
+        "accuracy = accuracy_score(y_test, y_pred)\n",
+        "print(f'Accuracy: {accuracy * 100:.2f}%')\n",
+        "print(classification_report(y_test, y_pred))"
+      ],
+      "metadata": {
+        "id": "urQQzeM8x_u-"
+      },
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
